@@ -1,6 +1,6 @@
 ---
 name: rust-quality-guard
-description: Rust 代码质量守护助手 - 提供全面的 Rust 代码质量检查、测试分析和错误容忍检测。在以下场景使用：(1) 检查 Rust 代码中的错误容忍和掩盖错误问题，(2) 执行 Rust 测试并分析失败原因，(3) 审查 Rust 代码质量和最佳实践，(4) 检查 clippy 警告和代码格式问题，(5) 准备提交代码前进行全面的代码质量检查。
+description: Rust 代码质量守护助手 - 提供全面的 Rust 代码质量检查、测试分析和错误容忍检测。在以下场景使用：(1) 编写 Rust 代码时遵循最佳实践和错误处理原则，(2) 检查 Rust 代码中的错误容忍和掩盖错误问题，(3) 执行 Rust 测试并分析失败原因，(4) 审查 Rust 代码质量和最佳实践，(5) 检查 clippy 警告和代码格式问题，(6) 准备提交代码前进行全面的代码质量检查。
 ---
 
 # Rust Quality Guard
@@ -13,6 +13,7 @@ Rust Quality Guard 是一个全面的 Rust 代码质量助手，结合了错误�
 
 在以下场景激活此技能：
 
+- **编写代码时**: 边写代码边遵循 FAIL FAST 原则和最佳实践，使用 `?` 传播错误，避免使用 `unwrap()`、`ok()` 等掩盖错误的模式
 - **检查错误容忍问题**: 检测 `unwrap()`、`ok()`、`unwrap_or_default()` 等可能掩盖错误的模式
 - **执行测试**: 运行 `cargo test` 并分析失败原因，提供修复建议
 - **代码审查**: 全面检查代码质量，包括 clippy、格式、最佳实践等
@@ -20,6 +21,35 @@ Rust Quality Guard 是一个全面的 Rust 代码质量助手，结合了错误�
 - **学习最佳实践**: 查询 Rust 错误处理和测试的最佳实践模式
 
 ## Quick Start
+
+### 0. 编写代码时遵循最佳实践
+
+在编写代码时就应该遵循 Rust 最佳实践：
+
+```rust
+// ✅ 使用 ? 传播错误
+fn get_user(id: u32) -> Result<User, Error> {
+    let user = db.query_user(id)?;  // 错误会向上传播
+    Ok(user)
+}
+
+// ❌ 不要使用 unwrap()
+fn get_user(id: u32) -> User {
+    db.query_user(id).unwrap()  // 可能 panic!
+}
+
+// ✅ 添加错误上下文
+fn process_payment(amount: u64) -> Result<(), Error> {
+    charge(amount)
+        .context("Failed to charge payment")?;
+    Ok(())
+}
+```
+
+**关键原则**:
+- 使用 `?` 传播错误，不要用 `unwrap()`
+- 关键业务逻辑（金额、余额）必须返回错误，不要用默认值
+- 添加有用的错误上下文信息
 
 ### 1. 检查错误容忍问题
 
@@ -147,13 +177,14 @@ match operation() {
 
 ## 工作流程
 
-### 场景 1: 新功能开发
+### 场景 1: 编写代码时
 
 1. 编写代码时遵循 FAIL FAST 原则
-2. 添加测试覆盖正常和错误情况
-3. 运行 `cargo test` 确保测试通过
-4. 运行 `cargo clippy` 修复警告
-5. 提交前运行完整检查流程
+2. 使用 `?` 传播错误，避免 `unwrap()`、`ok()` 等模式
+3. 添加测试覆盖正常和错误情况
+4. 运行 `cargo test` 确保测试通过
+5. 运行 `cargo clippy` 修复警告
+6. 定期运行 `check_error_tolerance.py` 检查代码质量
 
 ### 场景 2: 代码审查
 
