@@ -1,6 +1,6 @@
 ---
 name: rust-test
-description: 执行指定的 Rust 测试
+description: 使用 rust-quality-guard skill 执行指定的 Rust 测试
 parameters:
   - name: name
     type: string
@@ -11,69 +11,123 @@ tags:
   - testing
 ---
 
-执行名为 **{{name}}** 的 Rust 测试。
+# Rust 测试执行
 
-## 工作流程
+> **快捷方式**: 使用 `rust-quality-guard` skill 提供的 `run_rust_tests.py` 脚本
+
+## 快速使用
+
+```bash
+# 使用 rust-quality-guard skill 提供的脚本
+python3 scripts/run_rust_tests.py {{name}}
+
+# 如果项目使用 test-utils 特性
+python3 scripts/run_rust_tests.py {{name}} --features test-utils
+```
+
+## 脚本位置
+
+脚本位于 `rust-quality-guard` skill 中：
+- `scripts/run_rust_tests.py` - 测试执行和分析脚本
+
+如果当前项目中没有该脚本：
+```bash
+cp /Users/chenwei/.claude/plugins/cache/my-marketplace/myskills/4.1.12/skills/rust-quality-guard/scripts/run_rust_tests.py scripts/
+```
+
+## 脚本功能
+
+`run_rust_tests.py` 会自动：
 
 1. **环境检测**：
-   - 检测是否安装了 `cargo-nextest`
-   - 检测项目是否使用了 `test-utils` 特性
-   - 检测是否有 `.config/nextest.toml` 配置文件
+   - 检测是否安装 `cargo-nextest`
+   - 检测项目是否使用 `test-utils` 特性
+   - 检测 `.config/nextest.toml` 配置文件
 
-2. **搜索测试位置**：在项目中查找测试函数 `{{name}}`
+2. **搜索测试**：
+   - 在项目中查找测试函数 `{{name}}`
+   - 显示找到的 package、file 和 test 名称
 
-3. **确认信息**：显示找到的 package、file 和 test 名称，如果信息唯一就不要确认了。
+3. **执行测试**：
+   - 自动选择最佳工具（cargo-nextest 或 cargo test）
+   - 显示详细输出和错误堆栈
+   - 提供失败分析和修复建议
 
-4. **执行测试**：根据环境检测结果选择最佳工具运行测试
-
-## 环境检测
-
-### 1. 检测 cargo-nextest
-
-```bash
-if command -v cargo-nextest &> /dev/null; then
-    echo "✅ 检测到 cargo-nextest，将使用 nextest 运行测试"
-    USE_NEXTEST=true
-else
-    echo "ℹ️  未检测到 cargo-nextest，将使用 cargo test"
-    USE_NEXTEST=false
-fi
-```
-
-### 2. 检测 test-utils 特性
+## 脚本使用示例
 
 ```bash
-if grep -r "test-utils" --include="Cargo.toml" . &> /dev/null; then
-    echo "✅ 检测到 test-utils 特性"
-    USE_TEST_UTILS="--features test-utils"
-else
-    echo "ℹ️  未检测到 test-utils 特性"
-    USE_TEST_UTILS=""
-fi
+# 运行所有测试
+python3 scripts/run_rust_tests.py
+
+# 运行指定测试
+python3 scripts/run_rust_tests.py test_login
+
+# 启用 features
+python3 scripts/run_rust_tests.py --features "test-utils"
+python3 scripts/run_rust_tests.py --all-features
+
+# 指定包
+python3 scripts/run_rust_tests.py --package my-package test_login
 ```
 
-### 3. 检测 nextest 配置
+## test-utils 特性
+
+如果项目使用了 `test-utils` 特性：
+
+### 在 Cargo.toml 中声明
+
+```toml
+[features]
+test-utils = []
+```
+
+### 在源码中使用
+
+```rust
+#[cfg(feature = "test-utils")]
+pub mod testing {
+    pub fn create_test_client() -> Client {
+        Client::new_for_testing()
+    }
+}
+```
+
+### 运行测试时启用
 
 ```bash
-if [ -f ".config/nextest.toml" ]; then
-    echo "✅ 检测到 nextest 配置文件"
-    HAS_NEXTEST_CONFIG=true
-else
-    echo "ℹ️  未检测到 nextest 配置文件"
-    HAS_NEXTEST_CONFIG=false
-fi
+# ✅ 正确
+cargo test --features test-utils
+python3 scripts/run_rust_tests.py --features test-utils
+
+# ❌ 错误（如果代码依赖 test-utils）
+cargo test
 ```
 
-## 执行的命令
+## 关于 cargo-nextest
+
+**cargo-nextest** 是比 `cargo test` 更快的测试运行器：
+
+- ✅ 性能提升 20-30%
+- ✅ 智能重试 flaky tests
+- ✅ 更好的输出显示
+- ✅ 超时控制
+- ✅ JUnit 报告支持
+
+安装方法：
+```bash
+cargo install cargo-nextest
+```
+
+## 直接使用 cargo 命令
+
+如果不想使用脚本，也可以直接使用 cargo 命令：
 
 ### 使用 cargo-nextest (推荐)
-
-如果检测到 `cargo-nextest`：
 
 ```bash
 cargo nextest run \
     --package <package> \
-    $USE_TEST_UTILS \
+    --features test-utils \
     --test-name <test_name> \
     --no-capture \
     --success-output=immediate
@@ -81,44 +135,55 @@ cargo nextest run \
 
 ### 使用 cargo test (fallback)
 
-如果没有检测到 `cargo-nextest`：
-
 ```bash
 cargo test \
     --package <package> \
     --test <file> \
-    $USE_TEST_UTILS \
+    --features test-utils \
     -- {{name}} --exact --nocapture
 ```
 
-## 关于 nextest
+## 详细文档
 
-**cargo-nextest** 是一个比 `cargo test` 更快的测试运行器：
-
-- ✅ **性能提升**: 20-30% 的速度提升
-- ✅ **智能重试**: 自动重试 flaky tests
-- ✅ **更好的输出**: 清晰的测试状态显示
-- ✅ **超时控制**: 自动终止超时的测试
-- ✅ **JUnit 报告**: 支持 CI/CD 集成
-
-**安装方法**:
-```bash
-cargo install cargo-nextest
-```
-
-## 关于 test-utils 特性
-
-test-utils 是一个条件编译特性，用于在源码中提供测试辅助功能：
-
-- 使用 `#[cfg(feature = "test-utils")]` 门控的代码只在测试时编译
-- 生产构建不会包含这些测试辅助代码，减小二进制大小
-- 防止测试辅助函数在生产代码中意外调用
+更多测试最佳实践和调试技巧，请参考：
+- `myskills:rust-quality-guard` skill
+- `references/testing_best_practices.md` - 测试最佳实践
+- `references/error_handling_patterns.md` - 错误处理模式
 
 ## 注意事项
 
 - 测试名称必须完全匹配
 - 支持 `#[test]` 和 `#[tokio::test]` 等测试宏
 - `--no-capture` / `--nocapture` 选项会显示 println! 输出
-- 如果找到多个匹配的测试，会询问用户选择哪一个
-- 如果没有找到，会提示用户检查名称
-- nextest 使用 `--test-name` 而不是 `-- <test_name> --exact`
+- 脚本会自动处理多个匹配测试的情况
+- 如果找不到测试，会提示检查名称
+
+## 常见问题
+
+### 测试失败时的分析流程
+
+1. 脚本会单独执行失败的测试
+2. 对比批量和单独执行结果：
+   - 批量失败但单独通过 → 测试隔离问题 🟠
+   - 批量和单独都失败 → 代码逻辑问题 🔴
+3. 提供详细的修复建议
+
+### 测试隔离问题
+
+症状：批量执行失败，单独执行通过
+
+原因：共享资源污染、状态冲突
+
+解决方案：
+- 添加测试隔离
+- 使用独立的测试账户
+- 在测试前重置状态
+
+### 逻辑错误问题
+
+症状：批量和单独执行都失败
+
+解决方案：
+- 查看错误堆栈信息
+- 分析失败原因
+- 修复代码逻辑
