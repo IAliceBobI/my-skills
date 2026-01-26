@@ -53,6 +53,54 @@ Skill 会在以下场景自动激活：
 "编写代码时使用 rust-quality-guard 确保遵循最佳实践"
 ```
 
+## 灵活配置警告 - 学会变通
+
+**不是所有警告都需要处理！**学会区分真正的问题和噪音。
+
+### 快速配置示例
+
+#### 在 Cargo.toml 中全局配置（推荐）
+
+```toml
+[lints]
+# 开发时放宽限制，提高开发效率
+rust.unused_variables = "allow"   # 开发中常见
+rust.dead_code = "warn"           # 不阻止编译
+
+[lints.clippy]
+# 错误处理 - 保持严格
+unwrap_used = "warn"
+expect_used = "warn"
+
+# 代码风格 - 保持灵活
+too_many_lines = "allow"          # 允许长函数
+too_many_arguments = "allow"      # 允许较多参数
+module_name_repetitions = "allow" # 允许模块名重复
+```
+
+#### 在代码中局部忽略
+
+```rust
+// 需要说明原因
+#[allow(clippy::too_many_arguments)]
+// 每个参数都有明确的业务含义
+fn create_user(name: String, email: String, age: u32, /*...*/) { }
+```
+
+### 警告分类
+
+**✅ 重要警告（必须处理）**:
+- `unwrap_used`, `expect_used` - 错误处理问题
+- `panicking` - 可能 panic
+- `await_holding_lock` - 死锁风险
+
+**⚠️ 风格警告（可以忽略）**:
+- `too_many_lines` - 代码长度
+- `too_many_arguments` - 参数数量
+- `module_name_repetitions` - 命名重复
+
+详细配置方法请查看 SKILL.md 中的"灵活配置警告"章节。
+
 ## 核心 Cargo 命令
 
 ### 1. 自动修复代码问题

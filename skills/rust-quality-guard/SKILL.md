@@ -414,7 +414,291 @@ disallowed-methods = [
 
 # 配置特定 lints
 absolute-paths_allowed_modules = ["std", "core", "alloc"]
+
+# 允许一些不太重要的警告（灵活配置）
+# 配置某些复杂度阈值
+too-many-lines-threshold = 150  # 提高行数阈值
+function-line-threshold = 100    # 函数行数阈值
 ```
+
+## 灵活配置警告 - 学会变通
+
+**重要原则**: 不要对所有警告都一视同仁，有些警告是真正的问题，有些只是噪音。学会根据实际情况灵活配置。
+
+### 方法一：在代码中使用属性（局部忽略）
+
+适用于特殊情况，需要注释说明原因：
+
+```rust
+// 忽略单个函数的警告，并说明原因
+#[allow(clippy::too_many_arguments)]
+// 需要这么多参数因为每个参数都有明确的业务含义
+fn calculate_loan_score(
+    income: u64,
+    debt: u64,
+    age: u32,
+    years_employed: u32,
+    credit_history: u32,
+) -> f64 {
+    // ...
+}
+
+// 忽略整个模块的警告
+#[allow(dead_code)]
+mod legacy_code {
+    // 保留用于兼容旧版本，计划在 v2.0 中移除
+    fn old_function() {}
+}
+
+// 临时忽略开发中的代码
+#[allow(unused_variables)]
+fn developing_feature() {
+    let todo_feature = 42;  // TODO: 实现这个功能
+}
+```
+
+**常用允许属性**:
+- `#[allow(unused_variables)]` - 未使用的变量（开发中很常见）
+- `#[allow(dead_code)]` - 未使用的代码（保留的 API、计划中的功能）
+- `#[allow(clippy::too_many_lines)]` - 函数太长
+- `#[allow(clippy::too_many_arguments)]` - 参数太多
+- `#[allow(clippy::module_name_repetitions)]` - 模块名重复
+
+### 方法二：在 Cargo.toml 中全局配置（推荐）
+
+#### 项目级别配置
+
+```toml
+[lints]
+# 开发时放宽一些限制，提高开发效率
+rust.unused_variables = "allow"  # 开发中允许未使用变量
+rust.dead_code = "warn"          # 死代码降级为 warn，不阻止编译
+
+# Clippy 配置 - 区分重要和不重要的警告
+clippy::too_many_lines = "allow"           # 允许长函数
+clippy::too_many_arguments = "allow"       # 允许较多参数
+clippy::module_name_repetitions = "allow"  # 允许模块名重复
+clippy::must_use_candidate = "allow"       # 不强制要求 must_use
+
+# 但保持严格的错误处理
+clippy::unwrap_used = "warn"      # 仍然警告 unwrap
+clippy::expect_used = "warn"      # 仍然警告 expect
+```
+
+#### Workspace 级别配置
+
+```toml
+[workspace.lints]
+# 在整个 workspace 中统一配置
+rust.unused_variables = "allow"
+rust.dead_code = "warn"
+
+# Clippy 灵活配置
+clippy::too_many_lines = "allow"
+clippy::module_name_repetitions = "allow"
+
+# 测试代码中更宽松
+[workspace.lints.clippy]
+# 这些在测试中通常是必要的
+unwrap_used = "allow"
+expect_used = "allow"
+```
+
+然后在成员的 Cargo.toml 中继承：
+
+```toml
+[lints]
+workspace = true  # 继承 workspace 配置
+
+# 也可以根据项目需求覆盖
+[lints.clippy]
+too_many_lines = "warn"  # 这个项目对代码长度要求更严格
+```
+
+### 方法三：命令行参数（临时调整）
+
+```bash
+# 临时允许特定警告
+cargo clippy -- --allow clippy::too_many_lines
+
+# 允许多个警告
+cargo clippy -- --allow clippy::too_many_lines --allow dead_code
+
+# CI 中严格，开发时宽松
+cargo clippy -- -D warnings  # CI 中使用
+cargo clippy                  # 开发时使用
+```
+
+### 常见可忽略的"无害"警告
+
+#### 开发过程中的正常警告
+
+```rust
+// 1. 未使用的变量 - 开发中很常见
+#[allow(unused_variables)]
+fn in_development() {
+    let planned_feature = 42;  // 计划实现的功能
+}
+
+// 2. 死代码 - 保留的 API、计划中的功能
+#[allow(dead_code)]
+pub fn future_api() {
+    // 为下个版本预留的 API
+}
+
+// 3. 模块名重复 - 合理的项目结构
+#[allow(clippy::module_name_repetitions)]
+mod user {
+    pub mod user_handler { }  // user.user_handler 是合理的
+}
+```
+
+#### 合理的业务代码
+
+```rust
+// 1. 较多的参数 - 每个参数都有明确含义
+#[allow(clippy::too_many_arguments)]
+fn create_user(
+    name: String,
+    email: String,
+    age: u32,
+    address: String,
+    phone: String,
+) -> User {
+    // 每个字段都是必需的，参数多但不影响代码质量
+}
+
+// 2. 较长的函数 - 复杂的业务逻辑
+#[allow(clippy::too_many_lines)]
+fn process_payment_flow() {
+    // 150 行的支付流程，每个步骤都很重要
+    // 不应为了缩短函数而破坏可读性
+}
+
+// 3. 显式的类型转换 - 提高可读性
+#[allow(clippy::cast_possible_truncation)]
+let id = user_id as i32;  // 明确知道不会溢出
+```
+
+### 方法四：使用 clippy.toml 配置
+
+```toml
+# clippy.toml
+
+# 测试代码中允许更多
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+
+# 放宽一些复杂度限制
+too-many-lines-threshold = 150    # 提高行数阈值
+function-line-threshold = 100      # 函数行数阈值
+type-complexity-threshold = 250    # 类型复杂度阈值
+
+# 允许某些模式
+allow-print = true           # 允许 println! 用于调试
+allow-mixed-uninlined-format-args = true  # 允许混合格式参数
+```
+
+### 最佳实践建议
+
+1. **分层配置**
+   - **生产代码**: 对错误处理严格，对代码风格灵活
+   - **测试代码**: 放宽限制，提高开发效率
+   - **开发工具/脚本**: 可以更宽松
+
+2. **区分重要性和噪音**
+   ```
+   ✅ 重要警告（必须处理）:
+   - unwrap_used, expect_used       - 错误处理问题
+   - panicking, panic_in_result_fn  - 可能 panic
+   - empty_drop, drop_copy          - 逻辑错误
+   - await_holding_lock             - 死锁风险
+
+   ⚠️ 风格警告（可以忽略）:
+   - too_many_lines                  - 代码长度
+   - too_many_arguments              - 参数数量
+   - module_name_repetitions         - 命名重复
+   - must_use_candidate              - 建议性标记
+   ```
+
+3. **渐进式严格**
+   ```toml
+   # 项目初期：宽松配置
+   [lints]
+   rust.unused_variables = "allow"
+   clippy::too_many_lines = "allow"
+
+   # 项目成熟期：逐步严格
+   [lints]
+   rust.unused_variables = "warn"
+   clippy::too_many_lines = "warn"
+   ```
+
+4. **注释说明**
+   ```rust
+   // 当你确实需要忽略警告时，添加注释说明
+   #[allow(clippy::too_many_arguments)]
+   // 需要 8 个参数因为每个字段都对应数据库的一列，
+   // 重构为结构体会降低代码可读性
+   fn complex_query(/* 8 个参数 */) { }
+   ```
+
+### 推荐配置示例
+
+#### 严格的错误处理，宽松的代码风格
+
+```toml
+# Cargo.toml
+[lints]
+# 编译器警告 - 灵活配置
+rust.unused_variables = "allow"   # 开发中常见
+rust.dead_code = "warn"           # 不阻止编译
+rust.unused_imports = "warn"      # 可以自动清理
+
+[lints.clippy]
+# 错误处理 - 保持严格
+unwrap_used = "warn"
+expect_used = "warn"
+panicking = "warn"
+
+# 代码风格 - 保持灵活
+too_many_lines = "allow"
+too_many_arguments = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+```
+
+#### 不同环境的配置
+
+```toml
+# 开发环境
+[lints]
+rust.unused_variables = "allow"
+clippy::too_many_lines = "allow"
+
+# CI 环境（通过环境变量或 feature 控制）
+# CI 中使用: cargo clippy -- -D warnings
+```
+
+### 工作流程建议
+
+```bash
+# 开发时：宽松模式，允许快速迭代
+cargo clippy  # 使用 Cargo.toml 中的宽松配置
+
+# 提交前：严格检查
+cargo clippy -- -W clippy::unwrap_used -W clippy::expect_used
+
+# CI 中：最严格
+cargo clippy -- -D warnings
+```
+
+### 记住
+
+- **不是所有警告都是问题** - 学会区分真正的质量和噪音
+- **配置应该为项目服务** - 而不是为工具服务
+- **灵活但不随意** - 每个放宽的规则都应该有理由
+- **定期审查** - 每隔一段时间检查是否可以收紧配置
 
 在 `Cargo.toml` 中配置 Clippy lints：
 
