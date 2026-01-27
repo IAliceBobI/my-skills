@@ -22,9 +22,6 @@ echo "New version: $NEW_VERSION"
 # Update plugin.json
 sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
 
-# Update work.md
-sed -i '' "s/myskills\/$CURRENT_VERSION\//myskills\/$NEW_VERSION\//" commands/work.md
-
 echo "Version updated to $NEW_VERSION"
 
 # Commit and push
