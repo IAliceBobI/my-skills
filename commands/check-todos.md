@@ -1,15 +1,6 @@
 ---
 name: check-todos
-description: 检查代码中的 TODO 注释，评估是否适合处理
-parameters:
-  - name: path
-    type: string
-    required: false
-    description: 要检查的路径，默认为当前目录
-  - name: pattern
-    type: string
-    required: false
-    description: 文件匹配模式，如 '*.rs' 或 '*.{py,js}'
+description: 检查代码中的 TODO 注释，评估是否适合处理（自动检查整个项目）
 tags:
   - code-quality
   - maintenance
@@ -18,11 +9,11 @@ tags:
 
 # TODO 检查命令
 
-## 快速使用
+自动检查整个项目中的 TODO 注释。无需指定参数，默认检查当前目录的所有文件。
 
+执行命令：
 ```bash
-# 检查当前目录所有文件
-todo-check {{path}} {{pattern}}
+todo-check .
 ```
 
 ## 功能说明
@@ -47,21 +38,9 @@ todo-check {{path}} {{pattern}}
 - `NOTE:`
 - `@todo`
 
-## 使用示例
+## 检查范围
 
-```bash
-# 检查整个项目
-todo-check .
-
-# 只检查 Rust 文件
-todo-check . '*.rs'
-
-# 检查特定目录
-todo-check ./src
-
-# 检查多种文件类型
-todo-check . '*.{py,js,ts}'
-```
+默认检查整个项目（当前目录及所有子目录）的所有文件类型。
 
 ## 输出信息
 
